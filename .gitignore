@@ -1,0 +1,47 @@
+# This repo holds $HOME configs, so the risk is committing a secret that lives
+# next to one. Deny obvious credential files outright.
+.env
+.env.*
+*.pem
+*.key
+*_rsa
+*_ed25519
+**/.netrc
+**/.ssh/id_*
+
+# .zshrc reads its credentials out of files like ~/.github-token and
+# ~/.openai-token. Those files must never land in this repo.
+*-token
+*-token.*
+*.token
+.github-token
+.openai-token
+.tiptap-pro-token
+.vercel-token
+.openrouter-token
+.shadcn-token
+
+# Editor/tool state that has no business being version controlled.
+**/.config/zellij/config.kdl.*
+*.bak
+*.save
+*.orig
+*.swp
+*~
+
+# Claude Code local state (keep .claude/settings.json if you choose to track it)
+.claude/settings.local.json
+.claude/projects/
+.claude/todos/
+.claude/statsig/
+.claude/shell-snapshots/
+
+# LunarVim / Neovim runtime
+**/.local/share/lvim/
+**/.local/state/
+
+# Backups created by install/90-stow.sh
+.dotfiles-backup/
+
+# OS noise
+.DS_Store

@@ -1,0 +1,7 @@
+# Start zellij instead of a bare shell.
+# Each new Ghostty window/tab gets its own zellij session.
+# zellij spawns $SHELL (zsh) inside, so .zshrc still runs.
+command = /home/fugufish/.cargo/bin/zellij
+
+# Inherit the cwd from the surrounding window when opening new ones.
+working-directory = inherit
