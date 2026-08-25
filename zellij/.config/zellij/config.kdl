@@ -477,6 +477,17 @@ default_mode "locked"
 // copy_command "pbcopy"                     // osx
 // 
 // copy_command "pbcopy"
+
+// Route copies through the clipboard dispatcher rather than naming a backend
+// here: KDL has no conditionals, so WSL-vs-native detection has to happen at
+// runtime. The script picks wl-copy (WSLg mirrors that to the Windows
+// clipboard), xclip, or clip.exe, in that order.
+//
+// The path is absolute because Ghostty launches zellij with the bare system
+// PATH — no brew, no ~/.cargo/bin, no ~/.local/bin — the same reason the
+// Ghostty config spells out the zellij path. Without a copy_command zellij
+// falls back to OSC 52, which does not survive the Ghostty -> zellij nesting.
+copy_command "/home/fugufish/.local/bin/clipboard-copy"
  
 // Choose the destination for copied text
 // Allows using the primary selection buffer (on x11/wayland) instead of the system clipboard.

@@ -73,8 +73,15 @@ if [[ ${#TO_RUN[@]} -eq 0 ]]; then
   die "no matching steps for: ${REQUESTED[*]-} (try --list)"
 fi
 
-printf '%sUbuntu %s (%s) — %d step(s)%s\n' \
-  "$C_BOLD" "$UBUNTU_VERSION" "$UBUNTU_CODENAME" "${#TO_RUN[@]}" "$C_RESET"
+PLATFORM="Ubuntu $UBUNTU_VERSION ($UBUNTU_CODENAME)"
+if is_wsl; then
+  PLATFORM="$PLATFORM on WSL"
+  has_wslg ||
+    warn "WSL without a WSLg session — GUI apps and clipboard sharing will not work"
+fi
+
+printf '%s%s — %d step(s)%s\n' \
+  "$C_BOLD" "$PLATFORM" "${#TO_RUN[@]}" "$C_RESET"
 
 if [[ $DRY_RUN -eq 1 ]]; then
   for f in "${TO_RUN[@]}"; do info "would run $(basename "$f")"; done

@@ -1,0 +1,42 @@
+#!/usr/bin/env sh
+#
+# clipboard-paste — write the system clipboard to stdout.
+# The read-side counterpart to clipboard-copy; same detection order, same
+# reasons. See clipboard-copy for why the lookups are absolute-path first.
+
+set -u
+
+find_bin() {
+  _name=$1
+  for _dir in /usr/bin /bin /usr/local/bin /home/linuxbrew/.linuxbrew/bin \
+              "${HOME:-/root}/.local/bin" "${HOME:-/root}/.cargo/bin"; do
+    if [ -x "$_dir/$_name" ]; then
+      printf '%s\n' "$_dir/$_name"
+      return 0
+    fi
+  done
+  command -v "$_name" 2>/dev/null
+}
+
+if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  bin=$(find_bin wl-paste)
+  # --no-newline: wl-paste otherwise appends one that was never copied.
+  [ -n "$bin" ] && exec "$bin" --no-newline
+fi
+
+if [ -n "${DISPLAY:-}" ]; then
+  bin=$(find_bin xclip)
+  [ -n "$bin" ] && exec "$bin" -selection clipboard -o
+  bin=$(find_bin xsel)
+  [ -n "$bin" ] && exec "$bin" --clipboard --output
+fi
+
+if grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+  ps=/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
+  # Strips the CR that Windows adds to every line on the way out.
+  [ -x "$ps" ] && exec "$ps" -NoProfile -Command \
+    '[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard' | tr -d '\r'
+fi
+
+echo "clipboard-paste: no working clipboard backend" >&2
+exit 1

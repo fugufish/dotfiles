@@ -1,0 +1,80 @@
+#!/usr/bin/env sh
+#
+# clipboard-copy — read stdin, put it on the system clipboard.
+#
+# This exists so the terminal stack has one clipboard entry point that works the
+# same on WSL and on native Linux. zellij's config.kdl points its copy_command
+# here, because KDL has no conditionals: all host detection has to happen at
+# runtime, in a script.
+#
+# Two constraints drive the shape of this file:
+#
+#   1. It runs with Ghostty's environment, which is the bare system PATH — no
+#      brew, no ~/.cargo/bin, no ~/.local/bin. Every backend is therefore looked
+#      up by absolute path first, and only then through PATH.
+#   2. On WSL there is nothing WSL-specific to do in the normal case. WSLg
+#      bridges the Wayland clipboard to the Windows clipboard already, so
+#      wl-copy is the correct backend on WSL *and* on native Wayland. The
+#      Windows-only fallback below is for WSL without WSLg.
+
+set -u
+
+# find_bin <name> — absolute path to a helper, or nothing.
+find_bin() {
+  _name=$1
+  for _dir in /usr/bin /bin /usr/local/bin /home/linuxbrew/.linuxbrew/bin \
+              "${HOME:-/root}/.local/bin" "${HOME:-/root}/.cargo/bin"; do
+    if [ -x "$_dir/$_name" ]; then
+      printf '%s\n' "$_dir/$_name"
+      return 0
+    fi
+  done
+  command -v "$_name" 2>/dev/null
+}
+
+# Buffer stdin so a failed backend can be retried with the same input.
+#
+# Every backend below also gets its stdout and stderr sent to /dev/null. That is
+# not tidiness: wl-copy and xclip fork and stay resident to serve the selection,
+# and a resident child holding the caller's stdout keeps that pipe open, so
+# `x=$(printf hi | clipboard-copy)` would hang forever. Detaching them is what
+# makes this safe to use inside a pipeline or a command substitution.
+tmp=$(mktemp "${TMPDIR:-/tmp}/clipboard-copy.XXXXXX") || exit 1
+trap 'rm -f "$tmp"' EXIT INT TERM HUP
+cat > "$tmp"
+
+# --- Wayland (WSLg included) ------------------------------------------------
+if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  bin=$(find_bin wl-copy)
+  if [ -n "$bin" ] && "$bin" < "$tmp" >/dev/null 2>&1; then
+    exit 0
+  fi
+fi
+
+# --- X11 (XWayland under WSLg, or a real X session) -------------------------
+if [ -n "${DISPLAY:-}" ]; then
+  bin=$(find_bin xclip)
+  if [ -n "$bin" ] && "$bin" -selection clipboard < "$tmp" >/dev/null 2>&1; then
+    exit 0
+  fi
+  bin=$(find_bin xsel)
+  if [ -n "$bin" ] && "$bin" --clipboard --input < "$tmp" >/dev/null 2>&1; then
+    exit 0
+  fi
+fi
+
+# --- WSL without WSLg -------------------------------------------------------
+# Last resort only. clip.exe writes through the Windows console codepage, so
+# non-ASCII can be mangled; the Wayland path above does not have that problem.
+# Not reached on a normal WSLg session.
+if grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+  for clip in /mnt/c/Windows/System32/clip.exe /mnt/c/Windows/clip.exe; do
+    if [ -x "$clip" ] && "$clip" < "$tmp" >/dev/null 2>&1; then
+      exit 0
+    fi
+  done
+fi
+
+echo "clipboard-copy: no working clipboard backend" >&2
+echo "  install wl-clipboard (Wayland) or xclip (X11), or run ./install.sh wsl" >&2
+exit 1

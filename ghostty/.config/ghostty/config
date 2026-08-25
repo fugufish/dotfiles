@@ -5,3 +5,15 @@ command = /home/fugufish/.cargo/bin/zellij
 
 # Inherit the cwd from the surrounding window when opening new ones.
 working-directory = inherit
+
+# WSLg's compositor does not implement the Wayland primary-selection protocol
+# (wl-copy --primary fails with "The compositor does not seem to support
+# primary selection"). Ghostty's default `copy-on-select = true` prefers that
+# selection clipboard, so a mouse selection here lands nowhere and Ctrl+V on
+# the Windows side pastes stale text. `clipboard` writes the system clipboard
+# too, which WSLg does mirror to Windows.
+copy-on-select = clipboard
+
+# Same reason: there is no primary selection to paste from, so make the
+# default Shift+Insert binding use the system clipboard instead.
+keybind = shift+insert=paste_from_clipboard

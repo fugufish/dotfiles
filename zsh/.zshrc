@@ -127,7 +127,6 @@ export PATH="$HOME/.local/bin:$PATH"
 export PATH="/opt/erlang/bin:$PATH"
 export PATH="/opt/elixir/bin:$PATH"
 
-set -g set-clipboard on
 
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 alias wezterm='flatpak run org.wezfurlong.wezterm'
@@ -173,3 +172,22 @@ export PATH=/home/fugufish/.opencode/bin:$PATH
 
 alias wrangler="pnpm dlx wrangler"
 alias m="../../main && git pull"
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# ----------------------------------------------------------------------- WSL
+# Guarded so this same file still works on a native Ubuntu box. $WSL_DISTRO_NAME
+# alone is not a reliable test — it is unset in systemd units and in GUI apps
+# launched by WSLg — so fall back to the kernel string.
+if [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+  export IS_WSL=1
+
+  # Same dispatcher zellij copies through, so the shell and the terminal agree
+  # on what "the clipboard" means. Both ends reach the Windows clipboard via
+  # WSLg's Wayland bridge.
+  alias pbcopy='clipboard-copy'
+  alias pbpaste='clipboard-paste'
+
+  # /etc/wsl.conf sets appendWindowsPath=false, which keeps Windows binaries off
+  # PATH by design. Spell out the few that are genuinely useful from Linux.
+  alias explorer='/mnt/c/Windows/explorer.exe'
+fi

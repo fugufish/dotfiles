@@ -58,6 +58,37 @@ apt_refresh() {
   _APT_REFRESHED=1
 }
 
+# ----------------------------------------------------------------------- wsl --
+
+# is_wsl — are we inside WSL? Tests the kernel string rather than
+# $WSL_DISTRO_NAME, which is empty in contexts that matter here: systemd units,
+# and GUI apps launched by WSLg (Ghostty is one, and it passes its environment
+# down to zellij).
+is_wsl() {
+  [[ -n "${WSL_DISTRO_NAME:-}" ]] && return 0
+  grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null
+}
+
+# has_wslg — is WSLg's Wayland/X11 bridge present? This, not WSL itself, is what
+# mirrors the Linux clipboard to Windows, so clipboard setup keys off this.
+has_wslg() {
+  is_wsl && [[ -d /mnt/wslg ]] && [[ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]]
+}
+
+# win_exe <name> — absolute path to a Windows executable, or empty.
+# Never rely on PATH for these: /etc/wsl.conf may set appendWindowsPath=false
+# (it does on this machine), which keeps clip.exe and powershell.exe off PATH.
+win_exe() {
+  local name="$1" root
+  for root in /mnt/c/Windows/System32 /mnt/c/Windows; do
+    [[ -x "$root/$name" ]] && { printf '%s\n' "$root/$name"; return 0; }
+  done
+  [[ "$name" == powershell.exe ]] &&
+    [[ -x /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ]] &&
+    { printf '%s\n' /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe; return 0; }
+  return 1
+}
+
 # ------------------------------------------------------------------ prompts --
 
 # NONINTERACTIVE=1 makes every prompt take its default without blocking,

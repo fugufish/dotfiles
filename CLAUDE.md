@@ -8,12 +8,32 @@ A personal dotfiles repo that bootstraps a fresh **Ubuntu** workstation to match
 maintainer's existing environment: Node, Ruby, Python, Docker + Compose, LunarVim,
 Ghostty, zellij, git/GitHub CLI, and Claude Code — plus the config files for each.
 
-**Status:** `install.sh` and all `install/` steps exist and are tested. Four stow packages
-are populated — `zsh`, `ghostty`, `zellij`, `lvim` — copied **verbatim** from the live
-machine, so the cruft documented below is still present in `zsh/.zshrc` and the hardcoded
-zellij path is still in `ghostty/config`. Not yet packaged: `git/.gitconfig` and
-`asdf/.tool-versions`, which `10-asdf.sh` expects to find at
-`$DOTFILES_ROOT/asdf/.tool-versions`.
+**Status:** `install.sh` and all `install/` steps exist and are tested. Six stow packages
+are populated — `zsh`, `ghostty`, `zellij`, `lvim`, `asdf`, `bin` — the first four copied
+**verbatim** from the live machine, so the cruft documented below is still present in
+`zsh/.zshrc` and the hardcoded zellij path is still in `ghostty/config`. Still not
+packaged: `git/.gitconfig`.
+
+`asdf/.tool-versions` now exists and pins four runtimes — **neovim, nodejs, ruby,
+golang**. Until it did, `10-asdf.sh` found no `.tool-versions`, warned, and installed **no
+runtimes at all**: that is what left `nvim` missing and `30-lunarvim.sh` dying with
+"neovim missing", and left `node` unresolvable ("No version is set for command node")
+despite nodejs 26.7.0 being installed.
+
+**LunarVim needs Neovim 0.10+, and its branch name lies about that.** The branch
+`release-1.4/neovim-0.9` gates its *shell* installer on `has("nvim-0.9")` — a minimum, so
+0.9.5 passes — and then refuses at the Lazy setup step with "Lunarvim requires v0.10+".
+Pinning neovim to 0.9.x on the strength of the branch name produces an install that writes
+the `lvim` shim, dies before installing plugins, and leaves a half-install behind. Neovim
+is therefore pinned to **0.12.4**, and `30-lunarvim.sh` checks the real 0.10+ floor itself
+rather than trusting the branch name.
+
+That half-install is also why the step no longer trusts `have lvim`: the shim is written
+before plugins are, and it just execs nvim, so both `have lvim` and `lvim --version`
+succeed on a broken install. The completeness marker is
+`~/.local/share/lunarvim/site/pack/lazy/opt/lazy.nvim`.
+
+postgres and python remain plugins-without-pins; Python still comes from Homebrew.
 
 ## Two conventions drive the whole repo
 
@@ -25,6 +45,7 @@ this repo, and none should be added.
 
 ```
 zsh/.zshrc                              -> ~/.zshrc
+bin/.local/bin/clipboard-copy           -> ~/.local/bin/clipboard-copy
 git/.gitconfig                          -> ~/.gitconfig
 ghostty/.config/ghostty/config          -> ~/.config/ghostty/config
 zellij/.config/zellij/config.kdl        -> ~/.config/zellij/config.kdl
@@ -54,7 +75,9 @@ install/20-docker.sh     engine, compose plugin, docker group
 install/25-zellij.sh     rust/cargo + zellij (must precede 40 — Ghostty launches it)
 install/30-lunarvim.sh   lvim (depends on 10 — needs neovim)
 install/40-ghostty.sh    terminal, from ppa:mkasberg/ghostty-ubuntu
+install/45-wsl.sh        WSL clipboard bridge (no-op off WSL)
 install/50-git-gh.sh     git, gh, and the GitHub PAT / OAuth walkthrough
+install/55-ohmyzsh.sh    oh-my-zsh (must precede 90 — the stowed .zshrc sources it)
 install/60-claude.sh     Claude Code CLI
 install/90-stow.sh       stow every package (runs last)
 ```
@@ -117,6 +140,31 @@ working-directory = inherit
 Two consequences: zellij is a real dependency of the Ghostty step, and that absolute path
 is machine-specific — it needs to become `$HOME`-relative or templated before this config
 is portable.
+
+**This machine is WSL, and the clipboard chain is three layers deep.** WSLg's bridge works
+in both directions on its own — `wl-copy` reaches the Windows clipboard and `wl-paste`
+reads it, verified. What breaks is the layer above: because Ghostty launches zellij,
+**zellij owns the terminal and captures mouse selection**, so Ghostty's own copy never
+sees it. With no `copy_command`, zellij falls back to OSC 52, which does not survive the
+Ghostty → zellij nesting, and copies silently go nowhere.
+
+So `copy_command` in `config.kdl` is load-bearing, and it points at
+`~/.local/bin/clipboard-copy` (the `bin` package) rather than naming a backend. Two
+reasons, both easy to get wrong:
+
+- **KDL has no conditionals**, so WSL-vs-native detection has to happen at runtime, in a
+  script. The dispatcher tries Wayland, then X11, then `clip.exe`.
+- **Ghostty launches zellij with the bare system PATH** — no brew, no `~/.cargo/bin`, no
+  `~/.local/bin`. Anything zellij shells out to must be an absolute path, and the
+  dispatcher itself resolves its backends absolutely for the same reason. This is the
+  same constraint that forces the absolute zellij path in the Ghostty config.
+
+The dispatcher sends every backend's stdout to `/dev/null` on purpose: `wl-copy` and
+`xclip` fork and stay resident to serve the selection, and a resident child holding the
+caller's stdout makes `$(... | clipboard-copy)` hang forever.
+
+`/etc/wsl.conf` sets `appendWindowsPath=false`, so `clip.exe` and `powershell.exe` are
+**not on PATH**. Call them by absolute path (`win_exe` in `common.sh` does this).
 
 **zellij is a heavily customized, load-bearing config — not a default install.**
 `~/.config/zellij/config.kdl` is ~21KB and diverges from stock in ways that will look
