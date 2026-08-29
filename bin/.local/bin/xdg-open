@@ -1,0 +1,36 @@
+#!/bin/sh
+# xdg-open shim for WSL.
+#
+# Ghostty (and most Linux CLI tools) open links by exec'ing `xdg-open`. Inside
+# WSL there is no browser and no xdg-open at all, so links silently go nowhere.
+# Hand the target to the Windows shell instead, which resolves it with the
+# Windows default browser / file association.
+set -u
+
+[ $# -ge 1 ] || { echo "usage: xdg-open <url|file>" >&2; exit 1; }
+target=$1
+
+case "$target" in
+    # file:// points at a Linux path; translate it before Windows sees it.
+    file:*)
+        p=${target#file://}
+        p=${p#localhost}
+        target=$(wslpath -w "$p" 2>/dev/null) || exit 1
+        ;;
+    # Other schemes Windows already knows how to route. Pass through untouched.
+    [a-zA-Z][a-zA-Z0-9+.-]*://*|mailto:*|tel:*|ms-*:*|vscode:*) ;;
+    www.*) target="https://$target" ;;
+    *)
+        if [ -e "$target" ]; then
+            target=$(wslpath -w "$(readlink -f "$target")" 2>/dev/null) || exit 1
+        fi
+        ;;
+esac
+
+# Run from a drive-backed cwd: Windows binaries warn (and sometimes fall over)
+# when their working directory is a \\wsl.localhost UNC path.
+cd /mnt/c 2>/dev/null || cd /
+
+# explorer.exe exits 1 even on success, so its status is not worth reporting.
+/mnt/c/Windows/explorer.exe "$target" >/dev/null 2>&1
+exit 0

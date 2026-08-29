@@ -505,7 +505,16 @@ copy_command "/home/fugufish/.local/bin/clipboard-copy"
  
 // Path to the default editor to use to edit pane scrollbuffer
 // Default: $EDITOR or $VISUAL
-// scrollback_editor "/usr/bin/vim"
+//
+// Both of those are empty here: they are exported from .zshrc, and Ghostty
+// starts zellij through `sh -c`, which never sources it. zellij then falls back
+// to `vi`, and on the server's bare PATH that is /usr/bin/vim.basic — built
+// -clipboard -wayland_clipboard -xterm_clipboard, so has('clipboard') is 0 and
+// a yank in the scrollback editor can never reach the system clipboard.
+//
+// Absolute path for the same reason copy_command is absolute: the server's PATH
+// has no ~/.local/bin. The wrapper repairs PATH and execs lvim.
+scrollback_editor "/home/fugufish/.local/bin/scrollback-editor"
  
 // A fixed name to always give the Zellij session.
 // Consider also setting `attach_to_session true,`

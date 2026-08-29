@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+#
+# scrollback-editor — the editor zellij's EditScrollback should open.
+#
+# zellij runs this from the *server's* environment, not from a pane shell, and
+# that environment is whatever Ghostty handed zellij at startup. Two things are
+# missing from it, and together they pick the one editor on this box that cannot
+# reach the clipboard:
+#
+#   1. $EDITOR is unset. It is exported from .zshrc, and Ghostty starts zellij
+#      via `sh -c`, which never sources it. With $EDITOR and $VISUAL both empty
+#      zellij falls back to plain `vi`.
+#   2. PATH is the bare system one — no linuxbrew, no ~/.asdf/shims, no
+#      ~/.local/bin — so `vi` resolves to /usr/bin/vim.basic.
+#
+# Ubuntu builds vim.basic with -clipboard -wayland_clipboard -xterm_clipboard:
+# has('clipboard') is 0 and "+yy leaves the + register empty. Nothing downstream
+# can fix that, which is why the fix has to be "open a different editor".
+#
+# Repairing PATH is enough to reach the real one. `nvim` is an asdf shim, which
+# needs `asdf` itself — and asdf lives in linuxbrew — so all three directories
+# have to go back on. nvim is LazyVim; vim is only a last resort, and a poor
+# one -- Ubuntu's vim.basic is built -clipboard, which is the whole reason
+# this wrapper exists.
+
+set -u
+
+PATH="$HOME/.local/bin:$HOME/.asdf/shims:/home/linuxbrew/.linuxbrew/bin:$HOME/.cargo/bin:$PATH"
+export PATH
+
+for ed in nvim vim; do
+  if command -v "$ed" >/dev/null 2>&1; then
+    exec "$ed" "$@"
+  fi
+done
+
+echo "scrollback-editor: no editor found on PATH" >&2
+exit 1

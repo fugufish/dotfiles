@@ -5,33 +5,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this repo is
 
 A personal dotfiles repo that bootstraps a fresh **Ubuntu** workstation to match the
-maintainer's existing environment: Node, Ruby, Python, Docker + Compose, LunarVim,
+maintainer's existing environment: Node, Ruby, Python, Docker + Compose, LazyVim,
 Ghostty, zellij, git/GitHub CLI, and Claude Code — plus the config files for each.
 
 **Status:** `install.sh` and all `install/` steps exist and are tested. Six stow packages
-are populated — `zsh`, `ghostty`, `zellij`, `lvim`, `asdf`, `bin` — the first four copied
-**verbatim** from the live machine, so the cruft documented below is still present in
-`zsh/.zshrc` and the hardcoded zellij path is still in `ghostty/config`. Still not
-packaged: `git/.gitconfig`.
+are populated — `zsh`, `ghostty`, `zellij`, `nvim`, `asdf`, `bin` — `zsh`, `ghostty` and
+`zellij` copied **verbatim** from the live machine, so the cruft documented below is still
+present in `zsh/.zshrc` and the hardcoded zellij path is still in `ghostty/config`. Still
+not packaged: `git/.gitconfig`.
 
 `asdf/.tool-versions` now exists and pins four runtimes — **neovim, nodejs, ruby,
 golang**. Until it did, `10-asdf.sh` found no `.tool-versions`, warned, and installed **no
-runtimes at all**: that is what left `nvim` missing and `30-lunarvim.sh` dying with
+runtimes at all**: that is what left `nvim` missing and the editor step dying with
 "neovim missing", and left `node` unresolvable ("No version is set for command node")
 despite nodejs 26.7.0 being installed.
 
-**LunarVim needs Neovim 0.10+, and its branch name lies about that.** The branch
-`release-1.4/neovim-0.9` gates its *shell* installer on `has("nvim-0.9")` — a minimum, so
-0.9.5 passes — and then refuses at the Lazy setup step with "Lunarvim requires v0.10+".
-Pinning neovim to 0.9.x on the strength of the branch name produces an install that writes
-the `lvim` shim, dies before installing plugins, and leaves a half-install behind. Neovim
-is therefore pinned to **0.12.4**, and `30-lunarvim.sh` checks the real 0.10+ floor itself
-rather than trusting the branch name.
+**The editor is LazyVim, and it is config rather than an installed program.** LunarVim
+was here first and was removed: it is effectively unmaintained, its release branches lag
+current Neovim, and on the pinned 0.12.4 its nvim-treesitter died at file open with
+`E5113 ... Overriding existing predicate has-ancestor?`.
 
-That half-install is also why the step no longer trusts `have lvim`: the shim is written
-before plugins are, and it just execs nvim, so both `have lvim` and `lvim --version`
-succeed on a broken install. The completeness marker is
-`~/.local/share/lunarvim/site/pack/lazy/opt/lazy.nvim`.
+That swap changes the shape of the install step. There is no vendor installer and no
+`lvim`-style shim to detect — LazyVim *is* `nvim/.config/nvim`, and lazy.nvim bootstraps
+itself on first launch. So `30-lazyvim.sh` only guarantees what the config cannot: a
+Neovim at or above LazyVim's 0.11 floor, the CLI tools its pickers shell out to, and a
+warmed plugin cache via headless `Lazy! sync`. If the config is not stowed yet the step
+says so and exits 0, because the first real launch will bootstrap anyway.
+
+`fd` is the one dependency with a trap: Ubuntu's apt package installs the binary as
+`fdfind` to dodge a name collision, and LazyVim looks for `fd`. Homebrew ships the right
+name, so the step prefers brew.
 
 postgres and python remain plugins-without-pins; Python still comes from Homebrew.
 
@@ -49,7 +52,7 @@ bin/.local/bin/clipboard-copy           -> ~/.local/bin/clipboard-copy
 git/.gitconfig                          -> ~/.gitconfig
 ghostty/.config/ghostty/config          -> ~/.config/ghostty/config
 zellij/.config/zellij/config.kdl        -> ~/.config/zellij/config.kdl
-lvim/.config/lvim/config.lua            -> ~/.config/lvim/config.lua
+nvim/.config/nvim/init.lua              -> ~/.config/nvim/init.lua
 asdf/.tool-versions                     -> ~/.tool-versions
 ```
 
@@ -73,7 +76,7 @@ install/10-asdf.sh       asdf + plugins + .tool-versions runtimes
 install/15-python.sh     Python + uv, via brew (not asdf)
 install/20-docker.sh     engine, compose plugin, docker group
 install/25-zellij.sh     rust/cargo + zellij (must precede 40 — Ghostty launches it)
-install/30-lunarvim.sh   lvim (depends on 10 — needs neovim)
+install/30-lazyvim.sh    LazyVim deps + plugin bootstrap (depends on 10 — needs neovim)
 install/40-ghostty.sh    terminal, from ppa:mkasberg/ghostty-ubuntu
 install/45-wsl.sh        WSL clipboard bridge (no-op off WSL)
 install/50-git-gh.sh     git, gh, and the GitHub PAT / OAuth walkthrough
@@ -98,7 +101,7 @@ Every installer must be **idempotent** — re-running the full script on a confi
 machine is the normal way to apply updates, so guard each step with a
 "already installed?" check rather than assuming a clean box.
 
-Ordering is load-bearing in three places: `30-lunarvim.sh` needs the neovim that
+Ordering is load-bearing in three places: `30-lazyvim.sh` needs the neovim that
 `10-asdf.sh` installs, `40-ghostty.sh` is useless without the zellij from `25-zellij.sh`
 (Ghostty launches it as its shell command), and `90-stow.sh` runs last so configs land
 after the tools that read them exist.
@@ -195,9 +198,13 @@ the stow package; the rest should be gitignored.
 `50-git-gh.sh` must install `gh` *and* run `gh auth login`, or every push on a new box
 fails. The empty `helper = ` line before it is intentional — it clears inherited helpers.
 
-**LunarVim config is currently all defaults.** `~/.config/lvim/config.lua` contains only
-the boilerplate comment header. Commit `lazy-lock.json` alongside it so plugin versions
-reproduce.
+**LazyVim config is the starter template plus one deliberate change.**
+`lua/config/options.lua` pins `vim.g.clipboard` to the `clipboard-copy`/`clipboard-paste`
+dispatcher instead of letting Neovim autodetect a tool through `$PATH` — zellij's
+`EditScrollback` launches the editor with the server's bare PATH, which has no linuxbrew
+and therefore no `wl-copy`. `lua/config/lazy.lua` also sets `rocks = { enabled = false }`,
+without which `:checkhealth lazy` fails hard on a missing hererocks luarocks. Commit
+`lazy-lock.json` alongside the config so plugin versions reproduce.
 
 **Docker needs the group, and it's a re-login.** The maintainer's user is in the `docker`
 group with Compose v2 as a plugin (`docker compose`, not `docker-compose`). Group

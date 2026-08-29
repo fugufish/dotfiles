@@ -17,3 +17,12 @@ copy-on-select = clipboard
 # Same reason: there is no primary selection to paste from, so make the
 # default Shift+Insert binding use the system clipboard instead.
 keybind = shift+insert=paste_from_clipboard
+
+# Ctrl+click on a URL makes Ghostty exec `xdg-open`, which does not exist in
+# WSL. ~/.local/bin/xdg-open forwards the target to explorer.exe so it opens in
+# the Windows default browser; it must be symlinked onto Ghostty's own PATH
+# (/usr/local/bin) because Ghostty is launched by WSLg, not by the shell.
+#
+# zellij turns on mouse reporting, so it swallows the click before Ghostty sees
+# it. This toggles reporting off/on when a link needs clicking.
+keybind = ctrl+shift+m=toggle_mouse_reporting

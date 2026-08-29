@@ -114,7 +114,6 @@ export EDITOR=nvim
 export DENO_INSTALL="/home/fugufish/.deno"
 export PATH="$DENO_INSTALL/bin:$PATH"
 export PATH="/usr/local/bin:$PATH"
-export PATH="$(go env GOPATH)/bin:$PATH"
 
 # bun completions
 [ -s "/home/fugufish/.bun/_bun" ] && source "/home/fugufish/.bun/_bun"
@@ -191,3 +190,7 @@ if [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qi microsoft /proc/sys/kernel/osrele
   # PATH by design. Spell out the few that are genuinely useful from Linux.
   alias explorer='/mnt/c/Windows/explorer.exe'
 fi
+
+# WSL has no browser; ~/.local/bin/xdg-open hands URLs to the Windows shell.
+# Set BROWSER too, since many CLIs (gh, cargo doc, bundle open) prefer it.
+export BROWSER="$HOME/.local/bin/xdg-open"
