@@ -8,8 +8,8 @@ A personal dotfiles repo that bootstraps a fresh **Ubuntu** workstation to match
 maintainer's existing environment: Node, Ruby, Python, Docker + Compose, LazyVim,
 Ghostty, zellij, git/GitHub CLI, and Claude Code — plus the config files for each.
 
-**Status:** `install.sh` and all `install/` steps exist and are tested. Six stow packages
-are populated — `zsh`, `ghostty`, `zellij`, `nvim`, `asdf`, `bin` — `zsh`, `ghostty` and
+**Status:** `install.sh` and all `install/` steps exist and are tested. Seven stow packages
+are populated — `zsh`, `ghostty`, `zellij`, `nvim`, `asdf`, `bin`, `claude` — `zsh`, `ghostty` and
 `zellij` copied **verbatim** from the live machine, so the cruft documented below is still
 present in `zsh/.zshrc` and the hardcoded zellij path is still in `ghostty/config`. Still
 not packaged: `git/.gitconfig`.
@@ -54,6 +54,7 @@ ghostty/.config/ghostty/config          -> ~/.config/ghostty/config
 zellij/.config/zellij/config.kdl        -> ~/.config/zellij/config.kdl
 nvim/.config/nvim/init.lua              -> ~/.config/nvim/init.lua
 asdf/.tool-versions                     -> ~/.tool-versions
+claude/.claude/statusline.py            -> ~/.claude/statusline.py
 ```
 
 Adding a config file means placing it at its `$HOME`-relative path inside a package —
@@ -81,7 +82,7 @@ install/40-ghostty.sh    terminal, from ppa:mkasberg/ghostty-ubuntu
 install/45-wsl.sh        WSL clipboard bridge (no-op off WSL)
 install/50-git-gh.sh     git, gh, and the GitHub PAT / OAuth walkthrough
 install/55-ohmyzsh.sh    oh-my-zsh (must precede 90 — the stowed .zshrc sources it)
-install/60-claude.sh     Claude Code CLI
+install/60-claude.sh     Claude Code CLI + status line settings key
 install/90-stow.sh       stow every package (runs last)
 ```
 
