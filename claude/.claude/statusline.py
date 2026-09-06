@@ -107,7 +107,11 @@ def until(epoch):
 SUPABASE_API_BASE = 54321
 SUPABASE_BLOCK = 10
 WEB_PORT_BASE = 3000
-DEV_TOOL_PORT = 3010  # apps/dev-tool binds this regardless of slot
+# apps/dev-tool follows the slot layout now (tooling/.../slots.mjs). It reads
+# DEV_TOOL_PORT from the managed env block, so prefer that and only fall back
+# to the base. 3010 is not a dev-tool port at all any more - it is slot 10's
+# web port.
+DEV_TOOL_PORT_BASE = 3020
 
 ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
 
@@ -194,7 +198,8 @@ def services(root):
             found.append((name, value, f"{scheme}://127.0.0.1:{value}" if scheme else None))
 
     if os.path.isdir(os.path.join(root, "apps/dev-tool")):
-        found.append(("devtool", DEV_TOOL_PORT, f"http://localhost:{DEV_TOOL_PORT}"))
+        dev_tool = port(env, "DEV_TOOL_PORT") or DEV_TOOL_PORT_BASE + slot
+        found.append(("devtool", dev_tool, f"http://localhost:{dev_tool}"))
     return found
 
 
