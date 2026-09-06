@@ -155,12 +155,26 @@ esac
 # pnpm end
 
 
-GITHUB_PERSONAL_ACCESS_TOKEN=$(cat /home/fugufish/.github-token)
-OPENAI_API_KEY=$(cat /home/fugufish/.openai-token)
-TIPTAP_PRO_TOKEN=$(cat /home/fugufish/.tiptap-pro-token)
-VERCEL_TOKEN=$(cat /home/fugufish/.vercel-token)
-OPENROUTER_API_KEY=$(cat /home/fugufish/.openrouter-token)
-SHADCN_IO_TOKEN=$(cat /home/fugufish/.shadcn-token)
+# Credentials: one secret per file, none of them committed — only the variable
+# names live here. On a fresh box none of these files exist, so read each one
+# only if it's there rather than letting six `cat` errors spray across startup.
+# `$(<file)` is a shell builtin read, so this costs no subprocesses.
+# These are exported (unlike the plain assignments they replace) because MCP
+# servers, editors and scripts expect to find them in the environment.
+for _token_pair in \
+  GITHUB_PERSONAL_ACCESS_TOKEN:.github-token \
+  OPENAI_API_KEY:.openai-token \
+  TIPTAP_PRO_TOKEN:.tiptap-pro-token \
+  VERCEL_TOKEN:.vercel-token \
+  OPENROUTER_API_KEY:.openrouter-token \
+  SHADCN_IO_TOKEN:.shadcn-token
+do
+  _token_file="$HOME/${_token_pair#*:}"
+  if [[ -r "$_token_file" ]]; then
+    export "${_token_pair%%:*}=$(<"$_token_file")"
+  fi
+done
+unset _token_pair _token_file
 
 . ${ASDF_DATA_DIR:-$HOME/.asdf}/plugins/golang/set-env.zsh
 
